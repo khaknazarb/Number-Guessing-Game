@@ -1,0 +1,61 @@
+#!/bin/bash
+PSQL="psql -X --username=freecodecamp --dbname=number_guess -t --no-align -c"
+
+MAIN() {
+  echo "Enter your username:"
+  read USERNAME
+  max=1000
+  min=1
+  SECRET_NUMBER=$(($RANDOM%($max-$min+1)+$min))
+  USER_ID=$($PSQL "SELECT user_id FROM user_info WHERE name='$USERNAME'")
+  if [[ -z $USER_ID ]]
+  then
+    echo -e "\nWelcome, $USERNAME! It looks like this is your first time here."
+    echo -e "\nGuess the secret number between 1 and 1000:"
+    GAME 1
+    if [[ $? == 0 ]]
+    then
+      echo -e "\nYou guessed it in $ATTEMPT_NUMBER tries. The secret number was $SECRET_NUMBER. Nice job!"
+    fi
+    INSERT_USER=$($PSQL "INSERT INTO user_info(name) VALUES('$USERNAME')")
+    USER_ID=$($PSQL "SELECT user_id FROM user_info WHERE name='$USERNAME'")
+    INSERT_GAME=$($PSQL "INSERT INTO games(user_id,attempts) VALUES($USER_ID,$ATTEMPT_NUMBER)")
+  else
+   GAMES_PLAYED=$($PSQL "SELECT COUNT(attempts) FROM games INNER JOIN user_info USING(user_id) WHERE name='$USERNAME'")
+   BEST_GAME=$($PSQL "SELECT MIN(attempts) FROM games INNER JOIN user_info USING(user_id) WHERE name='$USERNAME'")
+   echo -e "\nWelcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
+   echo -e "\nGuess the secret number between 1 and 1000:"
+   GAME 1
+   if [[ $? == 0 ]]
+   then
+    echo -e "\nYou guessed it in $ATTEMPT_NUMBER tries. The secret number was $USER_GUESS. Nice job!"
+   fi
+   INSERT_GAME=$($PSQL "INSERT INTO games(user_id,attempts) VALUES($USER_ID,$ATTEMPT_NUMBER)")
+  fi
+}
+
+GAME() {
+  read USER_GUESS
+  ATTEMPT_NUMBER=$1
+  while [[ $USER_GUESS =~ [0-9]+ ]]
+  do
+    while [[ $USER_GUESS != $SECRET_NUMBER ]]
+    do
+      if [[ $USER_GUESS -lt $SECRET_NUMBER ]]
+      then
+        echo -e "\nIt's higher than that, guess again:"
+        ATTEMPT_NUMBER=$((ATTEMPT_NUMBER + 1))
+        GAME $ATTEMPT_NUMBER
+      else
+        echo -e "\nIt's lower than that, guess again:"
+        ATTEMPT_NUMBER=$((ATTEMPT_NUMBER + 1))
+        GAME $ATTEMPT_NUMBER
+      fi
+    done
+    return 0
+  done
+  echo  "That is not an integer, guess again:"
+  GAME 1
+}
+
+MAIN
